@@ -1,0 +1,89 @@
+project_name: stripe-mock
+
+before:
+  hooks:
+    - go get -u honnef.co/go/tools/cmd/staticcheck@latest
+    - go install github.com/go-bindata/go-bindata/...@latest
+    - go generate -mod=readonly
+    - go mod vendor
+
+builds:
+  - binary: stripe-mock
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+archives:
+  - format_overrides:
+      - goos: windows
+        format: zip
+
+brews:
+  - tap:
+      owner: stripe
+      name: homebrew-stripe-mock
+    homepage: "https://github.com/stripe/stripe-mock"
+    description: "stripe-mock is a mock HTTP server that responds like the real Stripe API. It can be used instead of Stripe's testmode to make test suites integrating with Stripe faster and less brittle."
+    commit_author:
+      name: stripe-ci
+      email: support@stripe.com
+    service: |
+      keep_alive successful_exit: false
+      run [
+        opt_bin/"stripe-mock",
+        "-http-port",
+        "12111",
+        "-https-port",
+        "12112"
+      ]
+      working_dir var
+      log_path var/"log/stripe-mock.log"
+      error_log_path var/"log/stripe-mock.log"
+
+nfpms:
+  - vendor: Stripe
+    homepage:  https://stripe.com
+    maintainer: Stripe <support@stripe.com>
+    license: MIT
+    formats:
+    - deb
+    - rpm
+
+dockers:
+  - image_templates:
+      - "stripe/stripe-mock:{{ .Tag }}-amd64"
+      - "stripe/stripe-mock:latest-amd64"
+    use: buildx
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    dockerfile: goreleaser.dockerfile
+  - image_templates:
+      - "stripe/stripe-mock:{{ .Tag }}-arm64"
+      - "stripe/stripe-mock:latest-arm64"
+    use: buildx
+    goos: linux
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    dockerfile: goreleaser.dockerfile
+
+docker_manifests:
+  - name_template: "stripe/stripe-mock:{{ .Tag }}"
+    image_templates: &image_templates
+      - "stripe/stripe-mock:{{ .Tag }}-amd64"
+      - "stripe/stripe-mock:{{ .Tag }}-arm64"
+  - name_template: "stripe/stripe-mock:latest"
+    image_templates: &image_templates
+      - "stripe/stripe-mock:latest-amd64"
+      - "stripe/stripe-mock:latest-arm64"
